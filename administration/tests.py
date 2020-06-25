@@ -20,13 +20,36 @@ class GetAllRequestsTest(APITestCase):
         BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
                                     ip='192.0.0.1', is_accepted=None, website=website)
         BlockRequest.objects.create(description='test desc 2', email='test2@mail.com',
-                                    ip='192.0.0.2', is_accepted=None, website=website2)
+                                    ip='192.0.0.2', is_accepted=False, website=website2)
         BlockRequest.objects.create(description='test desc 3', email='test3@mail.com',
-                                    ip='192.0.0.3', is_accepted=None, website=website2)
+                                    ip='192.0.0.3', is_accepted=True, website=website2)
 
     def test_get_all_requests(self):
         response = self.client.get(reverse('block_request_list'))
         block_requests = BlockRequest.objects.all()
+        serializer = BlockRequestSerializer(block_requests, many=True)
+        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class GetAllRequestsParamTest(APITestCase):
+    """ Test module for GET all block requests API with get params """
+
+    def setUp(self):
+        user = User.objects.create_superuser('test', 'test@example.com', 'test')
+        self.client.force_authenticate(user=user)
+        website = Website.objects.create(domain='http://example.com')
+        website2 = Website.objects.create(domain='http://example2.com')
+        BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
+                                    ip='192.0.0.1', is_accepted=None, website=website)
+        BlockRequest.objects.create(description='test desc 2', email='test2@mail.com',
+                                    ip='192.0.0.2', is_accepted=False, website=website2)
+        BlockRequest.objects.create(description='test desc 3', email='test3@mail.com',
+                                    ip='192.0.0.3', is_accepted=True, website=website2)
+
+    def test_get_all_requests_param(self):
+        response = self.client.get(reverse('block_request_list'), {'resolved': 0})
+        block_requests = BlockRequest.objects.exclude(is_accepted__isnull=False)
         serializer = BlockRequestSerializer(block_requests, many=True)
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

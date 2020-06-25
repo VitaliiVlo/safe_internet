@@ -21,15 +21,18 @@ class BlockRequestListView(APIView):
 
     @staticmethod
     def get(request):
-        domain = request.GET.get('domain', '')
-        is_accepted = request.GET.get('is_accepted')
-        if is_accepted is not None:
+        domain = request.GET.get('domain')
+        resolved = request.GET.get('resolved')
+        block_requests = BlockRequest.objects.all()
+        if domain is not None:
+            block_requests = block_requests.filter(website__domain__icontains=domain)
+        if resolved is not None:
             try:
-                is_accepted = bool(is_accepted)
+                resolved = bool(int(resolved))
             except TypeError:
-                return Response({'errors': 'incorrect type of parameter'}, status=status.HTTP_400_BAD_REQUEST)
-        block_requests = BlockRequest.objects.filter(website__domain__icontains=domain,
-                                                     is_accepted=is_accepted)
+                return Response({'errors': 'incorrect type of parameter resolved. Need to be 0 or 1.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            block_requests = block_requests.exclude(is_accepted__isnull=resolved)
         block_requests_serializer = BlockRequestSerializer(block_requests, many=True)
         return Response(block_requests_serializer.data, status=status.HTTP_200_OK)
 
