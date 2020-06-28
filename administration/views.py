@@ -1,11 +1,9 @@
 from django.shortcuts import get_object_or_404
-from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .decorators import parse_json
 from .models import BlockRequest
 from .permissions import IsAuthenticatedToRead
 from .serializers import BlockRequestSerializer
@@ -15,7 +13,6 @@ from .utils import get_ip_address, send_notification
 class BlockRequestListView(APIView):
     permission_classes = (IsAuthenticatedToRead,)
 
-    @method_decorator(parse_json)
     def dispatch(self, *args, **kwargs):
         return super(BlockRequestListView, self).dispatch(*args, **kwargs)
 
@@ -39,8 +36,8 @@ class BlockRequestListView(APIView):
     @staticmethod
     def post(request):
         ip = get_ip_address(request)
-        request.json['ip'] = ip
-        block_request_serializer = BlockRequestSerializer(data=request.json, context={'user': request.user})
+        request.data['ip'] = ip
+        block_request_serializer = BlockRequestSerializer(data=request.data, context={'user': request.user})
         if block_request_serializer.is_valid():
             block_request_serializer.save()
             return Response(status=status.HTTP_201_CREATED)
@@ -50,7 +47,6 @@ class BlockRequestListView(APIView):
 class BlockRequestDetailView(APIView):
     permission_classes = (IsAdminUser,)
 
-    @method_decorator(parse_json)
     def dispatch(self, *args, **kwargs):
         kwargs['block_request'] = get_object_or_404(BlockRequest, pk=kwargs.pop('pk', None))
         return super(BlockRequestDetailView, self).dispatch(*args, **kwargs)
@@ -63,7 +59,7 @@ class BlockRequestDetailView(APIView):
     @staticmethod
     def patch(request, block_request):
         old_is_accepted = block_request.is_accepted
-        block_request_serializer = BlockRequestSerializer(block_request, data=request.json, partial=True,
+        block_request_serializer = BlockRequestSerializer(block_request, data=request.data, partial=True,
                                                           context={'user': request.user})
         if block_request_serializer.is_valid():
             block_request_serializer.save()
@@ -75,7 +71,7 @@ class BlockRequestDetailView(APIView):
     @staticmethod
     def put(request, block_request):
         old_is_accepted = block_request.is_accepted
-        block_request_serializer = BlockRequestSerializer(block_request, data=request.json,
+        block_request_serializer = BlockRequestSerializer(block_request, data=request.data,
                                                           context={'user': request.user})
         if block_request_serializer.is_valid():
             block_request_serializer.save()
