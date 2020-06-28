@@ -2,6 +2,7 @@ import json
 
 from django.contrib.auth.models import User
 from django.urls import reverse
+from mixer.backend.django import mixer
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -13,16 +14,9 @@ class GetAllRequestsTest(APITestCase):
     """ Test module for GET all block requests API """
 
     def setUp(self):
-        user = User.objects.create_superuser('test', 'test@example.com', 'test')
+        user = mixer.blend(User, is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=user)
-        website = Website.objects.create(domain='http://example.com')
-        website2 = Website.objects.create(domain='http://example2.com')
-        BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
-                                    ip='192.0.0.1', is_accepted=None, website=website)
-        BlockRequest.objects.create(description='test desc 2', email='test2@mail.com',
-                                    ip='192.0.0.2', is_accepted=False, website=website2)
-        BlockRequest.objects.create(description='test desc 3', email='test3@mail.com',
-                                    ip='192.0.0.3', is_accepted=True, website=website2)
+        mixer.cycle(10).blend(BlockRequest, is_accepted=mixer.sequence(True, False, None))
 
     def test_get_all_requests(self):
         response = self.client.get(reverse('block_request_list'))
@@ -36,16 +30,9 @@ class GetAllRequestsParamTest(APITestCase):
     """ Test module for GET all block requests API with get params """
 
     def setUp(self):
-        user = User.objects.create_superuser('test', 'test@example.com', 'test')
+        user = mixer.blend(User, is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=user)
-        website = Website.objects.create(domain='http://example.com')
-        website2 = Website.objects.create(domain='http://example2.com')
-        BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
-                                    ip='192.0.0.1', is_accepted=None, website=website)
-        BlockRequest.objects.create(description='test desc 2', email='test2@mail.com',
-                                    ip='192.0.0.2', is_accepted=False, website=website2)
-        BlockRequest.objects.create(description='test desc 3', email='test3@mail.com',
-                                    ip='192.0.0.3', is_accepted=True, website=website2)
+        mixer.cycle(10).blend(BlockRequest, is_accepted=mixer.sequence(True, False, None))
 
     def test_get_all_requests_param(self):
         response = self.client.get(reverse('block_request_list'), {'resolved': 0})
@@ -59,11 +46,9 @@ class GetSingleRequestTest(APITestCase):
     """ Test module for GET single block request API """
 
     def setUp(self):
-        user = User.objects.create_superuser('test', 'test@example.com', 'test')
+        user = mixer.blend(User, is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=user)
-        website = Website.objects.create(domain='http://example.com')
-        self.block_request = BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
-                                                         ip='192.0.0.1', is_accepted=None, website=website)
+        self.block_request = mixer.blend(BlockRequest)
 
     def test_get_valid_single_request(self):
         response = self.client.get(
@@ -84,19 +69,19 @@ class CreateNewRequestTest(APITestCase):
 
     def setUp(self):
         self.valid_payload = {
-            'description': 'test desc 1',
-            'email': 'test1@mail.com',
-            'ip': '192.0.0.1',
-            'is_accepted': None,
-            'website': {'domain': 'http://example.com'}
+            'description': mixer.faker.text(max_nb_chars=500),
+            'email': mixer.faker.email(),
+            'ip': mixer.faker.ipv4(),
+            'is_accepted': True,
+            'website': {'domain': mixer.faker.url()}
         }
 
         self.invalid_payload = {
-            'description': 'test desc 1',
-            'email': 'test1@mail.com',
-            'ip': '192.0.1',
-            'is_accepted': None,
-            'website': {'domain': ''}
+            'description': mixer.faker.text(max_nb_chars=500),
+            'email': mixer.faker.text(),
+            'ip': mixer.faker.ipv4(),
+            'is_accepted': mixer.faker.null_boolean(),
+            'website': {'domain': mixer.faker.text()}
         }
 
     def test_create_valid_request(self):
@@ -108,6 +93,12 @@ class CreateNewRequestTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(BlockRequest.objects.count(), 1)
         self.assertEqual(Website.objects.count(), 1)
+
+        block_request = BlockRequest.objects.first()
+        self.assertEqual(self.valid_payload['description'], block_request.description)
+        self.assertEqual(self.valid_payload['email'], block_request.email)
+        self.assertEqual(None, block_request.is_accepted)
+        self.assertEqual(self.valid_payload['website']['domain'], block_request.website.domain)
 
     def test_create_invalid_request(self):
         response = self.client.post(
@@ -124,25 +115,23 @@ class UpdateSingleRequestTest(APITestCase):
     """ Test module for updating an existing block request record """
 
     def setUp(self):
-        user = User.objects.create_superuser('test', 'test@example.com', 'test')
+        user = mixer.blend(User, is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=user)
-        website = Website.objects.create(domain='http://example.com')
-        self.block_request = BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
-                                                         ip='192.0.0.1', is_accepted=None, website=website)
-        self.valid_payload = {
-            'description': 'test',
-            'email': 'test2@mail.com',
-            'ip': '192.0.0.22',
-            'is_accepted': True,
-            'website': {'domain': 'http://example2.com'}
-        }
 
+        self.block_request = mixer.blend(BlockRequest)
+        self.valid_payload = {
+            'description': mixer.faker.text(max_nb_chars=500),
+            'email': mixer.faker.email(),
+            'ip': mixer.faker.ipv4(),
+            'is_accepted': mixer.faker.null_boolean(),
+            'website': {'domain': mixer.faker.url()}
+        }
         self.invalid_payload = {
-            'description': 'test',
-            'email': 'test1@mail.com',
-            'ip': '192.0.0',
-            'is_accepted': None,
-            'website': {'domain': ''}
+            'description': mixer.faker.text(max_nb_chars=500),
+            'email': mixer.faker.text(),
+            'ip': mixer.faker.ipv4(),
+            'is_accepted': mixer.faker.null_boolean(),
+            'website': {'domain': mixer.faker.text()}
         }
 
     def test_valid_update_request(self):
@@ -152,6 +141,12 @@ class UpdateSingleRequestTest(APITestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        block_request = BlockRequest.objects.first()
+        self.assertEqual(self.valid_payload['description'], block_request.description)
+        self.assertEqual(self.valid_payload['email'], block_request.email)
+        self.assertEqual(self.valid_payload['ip'], block_request.ip)
+        self.assertEqual(self.valid_payload['is_accepted'], block_request.is_accepted)
+        self.assertEqual(self.valid_payload['website']['domain'], block_request.website.domain)
 
     def test_invalid_update_request(self):
         response = self.client.put(
@@ -159,25 +154,29 @@ class UpdateSingleRequestTest(APITestCase):
             data=json.dumps(self.invalid_payload),
             content_type='application/json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        block_request = BlockRequest.objects.first()
+        self.assertEqual(self.block_request.description, block_request.description)
+        self.assertEqual(self.block_request.email, block_request.email)
+        self.assertEqual(self.block_request.ip, block_request.ip)
+        self.assertEqual(self.block_request.website.domain, block_request.website.domain)
 
 
 class PartialUpdateSingleRequestTest(APITestCase):
     """ Test module for partial updating an existing block request record """
 
     def setUp(self):
-        user = User.objects.create_superuser('test', 'test@example.com', 'test')
+        user = mixer.blend(User, is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=user)
-        website = Website.objects.create(domain='http://example.com')
-        self.block_request = BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
-                                                         ip='192.0.0.1', is_accepted=None, website=website)
-        self.valid_payload = {
-            'is_accepted': True,
-            'website': {'domain': 'http://example2.com'}
-        }
 
+        self.block_request = mixer.blend(BlockRequest)
+
+        self.valid_payload = {
+            'email': mixer.faker.email(),
+            'website': {'domain': mixer.faker.url()}
+        }
         self.invalid_payload = {
-            'is_accepted': None,
-            'website': {'domain': ''}
+            'email': mixer.faker.text(),
+            'website': {'domain': mixer.faker.text()}
         }
 
     def test_valid_partial_update_request(self):
@@ -187,6 +186,9 @@ class PartialUpdateSingleRequestTest(APITestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        block_request = BlockRequest.objects.first()
+        self.assertEqual(self.valid_payload['email'], block_request.email)
+        self.assertEqual(self.valid_payload['website']['domain'], block_request.website.domain)
 
     def test_invalid_partial_update_request(self):
         response = self.client.patch(
@@ -194,17 +196,19 @@ class PartialUpdateSingleRequestTest(APITestCase):
             data=json.dumps(self.invalid_payload),
             content_type='application/json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        block_request = BlockRequest.objects.first()
+        self.assertEqual(self.block_request.email, block_request.email)
+        self.assertEqual(self.block_request.website.domain, block_request.website.domain)
 
 
 class DeleteSingleRequestTest(APITestCase):
     """ Test module for deleting an existing block request record """
 
     def setUp(self):
-        user = User.objects.create_superuser('test', 'test@example.com', 'test')
+        user = mixer.blend(User, is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=user)
-        website = Website.objects.create(domain='http://example.com')
-        self.block_request = BlockRequest.objects.create(description='test desc 1', email='test1@mail.com',
-                                                         ip='192.0.0.1', is_accepted=None, website=website)
+
+        self.block_request = mixer.blend(BlockRequest)
 
     def test_valid_delete_request(self):
         response = self.client.delete(
@@ -216,3 +220,4 @@ class DeleteSingleRequestTest(APITestCase):
         response = self.client.delete(
             reverse('block_request_detail', kwargs={'pk': 3000}))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(BlockRequest.objects.count(), 1)
