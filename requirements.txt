@@ -6,7 +6,7 @@ Django==3.0.7
 django-appconf==1.0.4
 django-celery-email==3.0.0
 django-cors-headers==3.4.0
-djangorestframework==3.11.0
+djangorestframework==3.11.2
 djangorestframework-simplejwt==4.4.0
 Faker==0.9.1
 future==0.18.2
